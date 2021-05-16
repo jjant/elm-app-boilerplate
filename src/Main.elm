@@ -2,17 +2,9 @@ module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Navigation exposing (Key)
-import Element
-    exposing
-        ( centerX
-        , image
-        , padding
-        , px
-        , spacing
-        , text
-        , width
-        )
-import Element.Region as Region
+import Html
+import Pages.Home as Home
+import Pages.NotFound as NotFound
 import Route
 import Url exposing (Url)
 
@@ -28,7 +20,7 @@ type alias Model =
 
 
 type PageState
-    = Home
+    = Home Home.Model
     | NotFound
 
 
@@ -49,10 +41,16 @@ initPage url =
     in
     case route of
         Route.Home ->
-            ( Home, Cmd.none )
+            Home.init
+                |> toMainTuple Home HomeMsg
 
         Route.NotFound ->
             ( NotFound, Cmd.none )
+
+
+toMainTuple : (pageModel -> PageState) -> (pageMsg -> PageMsg) -> ( pageModel, Cmd pageMsg ) -> ( PageState, Cmd Msg )
+toMainTuple toModel toMsg ( model, cmd ) =
+    ( toModel model, Cmd.map (PageMsg << toMsg) cmd )
 
 
 
@@ -61,8 +59,13 @@ initPage url =
 
 type Msg
     = NoOp
+    | PageMsg PageMsg
     | LinkClicked UrlRequest
     | UrlChanged Url
+
+
+type PageMsg
+    = HomeMsg Home.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,8 +90,26 @@ update msg model =
             in
             ( { model | pageState = pageState }, pageCmds )
 
+        PageMsg pageMsg ->
+            let
+                ( newPageState, pageCmds ) =
+                    updatePage pageMsg model.pageState
+            in
+            ( { model | pageState = newPageState }, pageCmds )
+
         NoOp ->
             ( model, Cmd.none )
+
+
+updatePage : PageMsg -> PageState -> ( PageState, Cmd Msg )
+updatePage pageMsg pageState =
+    case ( pageMsg, pageState ) of
+        ( HomeMsg homeMsg, Home homeModel ) ->
+            Home.update homeMsg homeModel
+                |> toMainTuple Home HomeMsg
+
+        ( _, _ ) ->
+            ( pageState, Cmd.none )
 
 
 
@@ -96,24 +117,20 @@ update msg model =
 
 
 view : Model -> Document Msg
-view _ =
-    { title = "Your elm app!"
-    , body =
-        [ Element.layout [] <|
-            Element.column
-                [ centerX
-                , padding 16
-                , spacing 16
-                ]
-                [ image
-                    [ width (px 200)
-                    , centerX
-                    ]
-                    { src = "/logo.svg", description = "Elm logo" }
-                , Element.el [ centerX, Region.heading 1 ]
-                    (text "Your Elm App is working!")
-                ]
-        ]
+view model =
+    case model.pageState of
+        Home homeModel ->
+            Home.view homeModel
+                |> mapView fromHomeMsg
+
+        NotFound ->
+            NotFound.view
+
+
+mapView : (a -> b) -> Document a -> Document b
+mapView f { title, body } =
+    { title = title
+    , body = List.map (Html.map f) body
     }
 
 
@@ -122,8 +139,14 @@ view _ =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.pageState of
+        Home homeModel ->
+            Home.subscriptions homeModel
+                |> Sub.map fromHomeMsg
+
+        NotFound ->
+            Sub.none
 
 
 
@@ -144,3 +167,12 @@ main =
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
+
+
+
+---- MISC ----
+
+
+fromHomeMsg : Home.Msg -> Msg
+fromHomeMsg =
+    HomeMsg >> PageMsg
