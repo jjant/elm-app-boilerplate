@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@parcel/transformer-elm": "2.0.0-beta.2",
+    "create-elm-app": "^5.22.0",
+    "elm": "^0.19.1-5"
+  },
+  "scripts": {
+    "start": "elm-app start"
+  }
+}
